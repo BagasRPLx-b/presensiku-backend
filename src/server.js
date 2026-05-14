@@ -7,7 +7,8 @@ const express = require('express');
 const cors    = require('cors');
 
 const app  = express();
-const PORT = process.env.PORT || 3000;
+// Railway biasanya akan otomatis memberikan PORT, jadi kita tangkap di sini
+const PORT = process.env.PORT || 8080;
 
 // === MIDDLEWARE ===
 app.use(express.json());
@@ -37,7 +38,6 @@ app.use('/api/stats',      statRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/leaves',     leaveRoutes);
 
-
 // Health check
 app.get('/', (req, res) => {
   res.json({ success: true, message: 'Presensi Ku API running', version: '1.0.0' });
@@ -54,7 +54,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: 'Internal Server Error' });
 });
 
-// Start
-app.listen(PORT, () => {
-  console.log(`Presensi Ku API running at http://localhost:${PORT}`);
+// Start Server - Menggunakan "0.0.0.0" agar sukses jalan di Railway
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Presensi Ku API running at port ${PORT}`);
 });
