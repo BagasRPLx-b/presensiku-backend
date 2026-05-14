@@ -288,13 +288,19 @@ router.get('/', async (req, res) => {
       [today]
     );
 
+    const normalizedRows = rows.map((row) => ({
+      ...row,
+      status_waktu: row.status_waktu || determineTimeStatus(row.jam_masuk) || 'Belum diatur',
+      status_pulang: row.status_pulang || 'Masih di Sekolah',
+    }));
+
     res.json({
       success: true,
       message: `Rekap absensi tanggal ${today}`,
       data: {
         tanggal:      today,
         total_hadir:  rows.length,
-        attendances:  rows,
+        attendances:  normalizedRows,
       },
     });
   } catch (error) {
