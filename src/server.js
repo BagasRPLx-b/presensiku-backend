@@ -7,12 +7,19 @@ const express = require('express');
 const cors    = require('cors');
 
 const app  = express();
-// Railway biasanya akan otomatis memberikan PORT, jadi kita tangkap di sini
 const PORT = process.env.PORT || 8080;
 
-// === MIDDLEWARE ===
+// === MIDDLEWARE (WAJIB URUTAN INI) ===
+
+// 1. Letakkan CORS di paling atas
+app.use(cors({ 
+  origin: '*', 
+  methods: ['GET','POST','PUT','DELETE','PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// 2. Parser JSON setelah CORS
 app.use(express.json());
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','PATCH'] }));
 
 // Request logger
 app.use((req, res, next) => {
@@ -43,18 +50,6 @@ app.get('/', (req, res) => {
   res.json({ success: true, message: 'Presensi Ku API running', version: '1.0.0' });
 });
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: `${req.method} ${req.url} not found` });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({ success: false, message: 'Internal Server Error' });
-});
-
-// Start Server - Menggunakan "0.0.0.0" agar sukses jalan di Railway
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Presensi Ku API running at port ${PORT}`);
 });

@@ -47,6 +47,19 @@ function getCurrentTime() {
 }
 
 // ----------------------------------------------------------
+// Helper: Hitung status waktu berdasarkan jam masuk
+//  - sebelum 06:45 => Tepat Waktu
+//  - 06:45 sampai 07:00 => Hampir Terlambat
+//  - setelah 07:00 => Terlambat
+// ----------------------------------------------------------
+function determineTimeStatus(time) {
+  if (!time) return null;
+  if (time <= '06:45:00') return 'Tepat Waktu';
+  if (time <= '07:00:00') return 'Hampir Terlambat';
+  return 'Terlambat';
+}
+
+// ----------------------------------------------------------
 // GET /api/attendance/qr-today
 // Endpoint untuk Web Admin
 // Mengembalikan string token QR unik khusus hari ini.
@@ -88,20 +101,13 @@ router.get('/qr-today', async (req, res) => {
 // ----------------------------------------------------------
 router.post('/scan', async (req, res) => {
   try {
-    const { student_id, qr_token, lokasi, status_waktu } = req.body;
+    const { student_id, qr_token, lokasi } = req.body;
 
     // Validasi input
     if (!student_id || !qr_token) {
       return res.status(400).json({
         success: false,
         message: 'student_id dan qr_token wajib diisi',
-      });
-    }
-
-    if (status_waktu && typeof status_waktu !== 'string') {
-      return res.status(400).json({
-        success: false,
-        message: 'status_waktu harus berupa string',
       });
     }
 
@@ -145,24 +151,26 @@ router.post('/scan', async (req, res) => {
 
     // ---- LANGKAH 4: Catat absensi ----
     const jamMasuk = getCurrentTime();
+    const statusWaktu = determineTimeStatus(jamMasuk);
 
     const [result] = await db.query(
-      'INSERT INTO attendances (student_id, tanggal, jam_masuk, status, lokasi, status_waktu) VALUES (?, ?, ?, ?, ?, ?)',
-      [student_id, today, jamMasuk, 'hadir', lokasi || null, status_waktu || null]
+      'INSERT INTO attendances (student_id, tanggal, jam_masuk, status, lokasi, status_waktu, status_pulang) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [student_id, today, jamMasuk, 'hadir', lokasi || null, statusWaktu, 'Masih di Sekolah']
     );
 
     res.status(201).json({
       success: true,
       message: 'Absensi berhasil dicatat',
       data: {
-        id:           result.insertId,
-        student_id:   parseInt(student_id, 10),
-        nama_lengkap: studentRows[0].nama_lengkap,
-        tanggal:      today,
-        jam_masuk:    jamMasuk,
-        status:       'hadir',
-        lokasi:       lokasi || null,
-        status_waktu: status_waktu || null,
+        id:             result.insertId,
+        student_id:     parseInt(student_id, 10),
+        nama_lengkap:   studentRows[0].nama_lengkap,
+        tanggal:        today,
+        jam_masuk:      jamMasuk,
+        status:         'hadir',
+        lokasi:         lokasi || null,
+        status_waktu:   statusWaktu,
+        status_pulang:  'Masih di Sekolah',
       },
     });
   } catch (error) {
@@ -171,6 +179,39 @@ router.post('/scan', async (req, res) => {
       success: false,
       message: 'Terjadi kesalahan server',
     });
+  }
+});
+
+// ----------------------------------------------------------
+// PATCH /api/attendance/:id/pulang
+// Tandai siswa sudah pulang dari sekolah
+// ----------------------------------------------------------
+router.patch('/:id/pulang', async (req, res) => {
+  try {
+    const attendanceId = req.params.id;
+
+    const [existing] = await db.query(
+      'SELECT id, status_pulang FROM attendances WHERE id = ?',
+      [attendanceId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Data absensi tidak ditemukan' });
+    }
+
+    if (existing[0].status_pulang === 'Sudah Pulang') {
+      return res.status(400).json({ success: false, message: 'Siswa sudah ditandai pulang' });
+    }
+
+    await db.query(
+      'UPDATE attendances SET status_pulang = ? WHERE id = ?',
+      ['Sudah Pulang', attendanceId]
+    );
+
+    res.json({ success: true, message: 'Status pulang berhasil diperbarui' });
+  } catch (error) {
+    console.error('Error update status pulang:', error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 });
 
@@ -239,7 +280,7 @@ router.get('/', async (req, res) => {
          a.jam_masuk,
          a.status,
          a.status_waktu,
-         a.lokasi
+         a.status_pulang
        FROM attendances a
        JOIN students s ON a.student_id = s.id
        WHERE a.tanggal = ?
