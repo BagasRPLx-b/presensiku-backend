@@ -1,19 +1,17 @@
-const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
+const admin = require("firebase-admin");
 
-const serviceAccountPath = path.join(__dirname, 'firebaseServiceAccount.json');
+let serviceAccount;
 
-if (fs.existsSync(serviceAccountPath)) {
-  const serviceAccount = require(serviceAccountPath);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-  console.log('✅ Firebase Admin SDK initialized');
+if (process.env.FIREBASE_CONFIG) {
+  // Jika di Railway, baca dari tab Variables
+  serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
 } else {
-  console.warn('⚠️ Firebase service account file not found. Push notifications will not work.');
-  // Initialize without credentials for testing/dev purposes if needed, or leave uninitialized.
-  // admin.initializeApp(); 
+  // Jika di localhost, baca dari file
+  serviceAccount = require("./firebaseServiceAccount.json");
 }
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 module.exports = admin;
